@@ -2,22 +2,19 @@ import numpy as np
 import matplotlib.pyplot as plt
 from scipy.stats import binom, poisson
 import pandas as pd
-from math import factorial
 import seaborn as sns
+from mpl_toolkits.mplot3d import Axes3D
+from matplotlib import cm
+import warnings
+warnings.filterwarnings('ignore')
 
-# Thiết lập style cho đồ thị
+# Thiết lập style nâng cao
 plt.style.use('seaborn-v0_8-darkgrid')
 sns.set_palette("husl")
+sns.set_context("notebook", font_scale=1.2)
 
 class PoissonBinomialConvergence:
     def __init__(self, lambda_param=3, n_values=None):
-        """
-        Khởi tạo tham số mô phỏng
-
-        Parameters:
-        lambda_param: tham số lambda của phân phối Poisson
-        n_values: danh sách các giá trị n để mô phỏng
-        """
         self.lambda_param = lambda_param
 
         if n_values is None:
@@ -25,19 +22,13 @@ class PoissonBinomialConvergence:
         else:
             self.n_values = n_values
 
-        self.k_values = np.arange(0, 15)  # Xét từ 0 đến 14 sự kiện
+        self.k_values = np.arange(0, 15)
 
     def calculate_probabilities(self):
-        """
-        Tính xác suất cho cả phân phối nhị thức và Poisson
-        """
         results = {}
-
-        # Tính phân phối Poisson (chính xác)
         poisson_probs = poisson.pmf(self.k_values, self.lambda_param)
         results['Poisson'] = poisson_probs
 
-        # Tính phân phối nhị thức với các n khác nhau
         for n in self.n_values:
             p = self.lambda_param / n
             binomial_probs = binom.pmf(self.k_values, n, p)
@@ -46,57 +37,57 @@ class PoissonBinomialConvergence:
         return results
 
     def plot_comparison(self, results):
-        """
-        Vẽ đồ thị so sánh các phân phối
-        """
-        fig, axes = plt.subplots(2, 3, figsize=(15, 10))
-        axes = axes.ravel()
+        fig, axes = plt.subplots(2, 3, figsize=(16, 10), constrained_layout=True)
+        fig.suptitle(f'So sánh phân phối Nhị thức và Poisson với λ = {self.lambda_param}',
+                    fontsize=18, fontweight='bold', y=1.05)
 
+        axes = axes.ravel()
         poisson_probs = results['Poisson']
 
         for idx, n in enumerate(self.n_values):
             if idx >= len(axes):
                 break
 
+            ax = axes[idx]
             binomial_key = f'Binomial_n={n}'
             binomial_probs = results[binomial_key]
+            p = self.lambda_param / n
 
-            # Vẽ biểu đồ cột
             width = 0.35
             x = np.arange(len(self.k_values))
 
-            axes[idx].bar(x - width/2, binomial_probs, width,
-                         label=f'Binomial (n={n})', alpha=0.8)
-            axes[idx].bar(x + width/2, poisson_probs, width,
-                         label=f'Poisson (λ={self.lambda_param})', alpha=0.8)
+            bars1 = ax.bar(x - width/2, binomial_probs, width,
+                          label=f'Binomial (n={n}, p={p:.3f})',
+                          alpha=0.8, color='#3498db', edgecolor='darkblue', linewidth=1.5)
 
-            axes[idx].set_xlabel('Số sự kiện (k)')
-            axes[idx].set_ylabel('Xác suất P(X=k)')
-            axes[idx].set_title(f'So sánh với n = {n}')
-            axes[idx].legend()
-            axes[idx].set_xticks(x)
-            axes[idx].set_xticklabels(self.k_values)
+            bars2 = ax.bar(x + width/2, poisson_probs, width,
+                          label=f'Poisson (λ={self.lambda_param})',
+                          alpha=0.8, color='#e74c3c', edgecolor='darkred', linewidth=1.5)
 
-            # Tính và hiển thị sai số
+            ax.set_xlabel('Số sự kiện (k)', fontsize=12)
+            ax.set_ylabel('Xác suất P(X=k)', fontsize=12)
+            ax.set_title(f'n = {n}\np = {p:.4f}, np = {self.lambda_param:.3f}',
+                        fontsize=13, fontweight='bold', pad=10)
+            ax.legend(fontsize=10, loc='best')
+            ax.set_xticks(x[::2])
+            ax.set_xticklabels(self.k_values[::2])
+            ax.grid(True, alpha=0.3, linestyle='--')
+
             mae = np.mean(np.abs(binomial_probs - poisson_probs))
-            axes[idx].text(0.05, 0.95, f'MAE: {mae:.4f}',
-                          transform=axes[idx].transAxes,
-                          fontsize=10, verticalalignment='top',
-                          bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.5))
+            info_text = f'MAE: {mae:.4f}'
+            ax.text(0.02, 0.98, info_text, transform=ax.transAxes,
+                   fontsize=9, verticalalignment='top',
+                   bbox=dict(boxstyle='round', facecolor='lightyellow',
+                            alpha=0.9, edgecolor='gold'))
 
-        plt.tight_layout()
-        plt.savefig('poisson_binomial_comparison.png', dpi=300, bbox_inches='tight')
+        plt.savefig('poisson_binomial_comparison_enhanced.png',
+                   dpi=300, bbox_inches='tight', facecolor='white')
         plt.show()
 
     def plot_convergence(self, results):
-        """
-        Vẽ đồ thị thể hiện sự hội tụ
-        """
-        plt.figure(figsize=(12, 6))
+        fig = plt.figure(figsize=(14, 6), constrained_layout=True)
 
         poisson_probs = results['Poisson']
-
-        # Tính sai số tuyệt đối trung bình (MAE) cho từng n
         mae_values = []
 
         for n in self.n_values:
@@ -105,190 +96,300 @@ class PoissonBinomialConvergence:
             mae = np.mean(np.abs(binomial_probs - poisson_probs))
             mae_values.append(mae)
 
-        # Vẽ đồ thị sai số theo n
         plt.subplot(1, 2, 1)
-        plt.plot(self.n_values, mae_values, 'o-', linewidth=2, markersize=8)
-        plt.xlabel('n (số phép thử)')
-        plt.ylabel('Sai số tuyệt đối trung bình (MAE)')
-        plt.title('Sự hội tụ của sai số')
+        plt.plot(self.n_values, mae_values, 'o-', linewidth=3, markersize=10,
+                label='MAE', color='#2c3e50', markerfacecolor='#e74c3c',
+                markeredgewidth=2, markeredgecolor='black')
+
+        plt.xlabel('Số phép thử (n)', fontsize=13)
+        plt.ylabel('Sai số tuyệt đối trung bình (MAE)', fontsize=13)
+        plt.title('Sự hội tụ của sai số khi n tăng', fontsize=14, fontweight='bold')
         plt.grid(True, alpha=0.3)
 
-        # Vẽ đồ thị log-log để thấy tốc độ hội tụ
         plt.subplot(1, 2, 2)
-        plt.loglog(self.n_values, mae_values, 's-', linewidth=2, markersize=8)
-        plt.xlabel('n (log scale)')
-        plt.ylabel('MAE (log scale)')
-        plt.title('Tốc độ hội tụ (log-log scale)')
-        plt.grid(True, alpha=0.3)
+        log_n = np.log(self.n_values)
+        log_mae = np.log(mae_values)
 
-        # Thêm đường hồi quy
-        if len(self.n_values) > 1:
-            coeffs = np.polyfit(np.log(self.n_values), np.log(mae_values), 1)
-            slope = coeffs[0]
-            plt.text(0.05, 0.95, f'Độ dốc: {slope:.3f}',
-                    transform=plt.gca().transAxes,
-                    fontsize=10, verticalalignment='top',
-                    bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.5))
+        plt.loglog(self.n_values, mae_values, 'o-', linewidth=3, markersize=10,
+                  label='Dữ liệu', color='#9b59b6', markerfacecolor='#3498db',
+                  markeredgewidth=2, markeredgecolor='black')
 
-        plt.tight_layout()
-        plt.savefig('convergence_rate.png', dpi=300, bbox_inches='tight')
+        plt.xlabel('n (thang log)', fontsize=13)
+        plt.ylabel('MAE (thang log)', fontsize=13)
+        plt.title('Tốc độ hội tụ (thang log-log)', fontsize=14, fontweight='bold')
+        plt.grid(True, alpha=0.3, which='both')
+
+        plt.suptitle(f'Sự hội tụ về phân phối Poisson (λ = {self.lambda_param})',
+                    fontsize=16, fontweight='bold', y=1.05)
+
+        plt.savefig('convergence_rate_enhanced.png', dpi=300, bbox_inches='tight', facecolor='white')
         plt.show()
 
         return mae_values
 
-    def create_summary_table(self, results):
+    def plot_multiple_lambda_comparison(self, lambda_list=[1, 3, 5, 7], n_values_plot=[5, 10, 20, 50]):
         """
-        Tạo bảng tổng hợp kết quả
+        Vẽ so sánh phân phối cho nhiều giá trị lambda (chỉ 1, 3, 5, 7)
         """
-        data = []
+        fig, axes = plt.subplots(len(lambda_list), len(n_values_plot),
+                                figsize=(4*len(n_values_plot), 3*len(lambda_list)),
+                                constrained_layout=True)
+        fig.suptitle('So sánh phân phối Nhị thức và Poisson với các giá trị λ khác nhau',
+                    fontsize=20, fontweight='bold', y=1.05)
 
+        for i, lam in enumerate(lambda_list):
+            for j, n in enumerate(n_values_plot):
+                ax = axes[i, j] if len(lambda_list) > 1 else axes[j]
+                p = lam / n
+
+                max_k = min(int(lam * 3) + 2, 25)
+                k_values = np.arange(0, max_k + 1)
+
+                binom_probs = binom.pmf(k_values, n, p)
+                poisson_probs = poisson.pmf(k_values, lam)
+
+                width = 0.35
+                x = np.arange(len(k_values))
+
+                ax.bar(x - width/2, binom_probs, width,
+                      alpha=0.7, label=f'B(n={n})',
+                      color='#3498db', edgecolor='darkblue', linewidth=1)
+                ax.bar(x + width/2, poisson_probs, width,
+                      alpha=0.7, label=f'Pois(λ={lam})',
+                      color='#e74c3c', edgecolor='darkred', linewidth=1)
+
+                mae = np.mean(np.abs(binom_probs - poisson_probs))
+
+                ax.set_xlabel('Số sự kiện (k)', fontsize=10)
+                if j == 0:
+                    ax.set_ylabel(f'λ={lam}\nP(X=k)', fontsize=11)
+                else:
+                    ax.set_ylabel('P(X=k)', fontsize=10)
+
+                ax.set_title(f'n={n}, p={p:.3f}', fontsize=11, fontweight='bold')
+                ax.legend(fontsize=8)
+                ax.grid(True, alpha=0.3)
+                ax.set_xticks(x[::max(1, len(x)//5)])
+
+                ax.text(0.05, 0.95, f'MAE: {mae:.4f}',
+                       transform=ax.transAxes, fontsize=9,
+                       verticalalignment='top',
+                       bbox=dict(boxstyle='round', facecolor='lightyellow', alpha=0.8))
+
+        plt.savefig('multiple_lambda_comparison.png', dpi=300, bbox_inches='tight', facecolor='white')
+        plt.show()
+
+        self.create_multi_lambda_summary(lambda_list, n_values_plot)
+
+    def create_multi_lambda_summary(self, lambda_list, n_values_plot):
+        summary_data = []
+
+        for lam in lambda_list:
+            for n in n_values_plot:
+                p = lam / n
+                k_values = np.arange(0, min(int(lam * 3) + 3, 30))
+
+                binom_probs = binom.pmf(k_values, n, p)
+                poisson_probs = poisson.pmf(k_values, lam)
+
+                mae = np.mean(np.abs(binom_probs - poisson_probs))
+                mse = np.mean((binom_probs - poisson_probs)**2)
+                max_error = np.max(np.abs(binom_probs - poisson_probs))
+
+                summary_data.append({
+                    'λ': lam,
+                    'n': n,
+                    'p': f'{p:.4f}',
+                    'MAE': f'{mae:.6f}',
+                    'MSE': f'{mse:.8f}',
+                    'Max Error': f'{max_error:.6f}',
+                    'Chất lượng xấp xỉ': 'Tốt' if mae < 0.01 else 'Khá' if mae < 0.05 else 'Trung bình'
+                })
+
+        df_summary = pd.DataFrame(summary_data)
+
+        print("\n" + "═" * 100)
+        print(f"{'BẢNG TỔNG HỢP SAI SỐ':^100}")
+        print("═" * 100)
+        print(df_summary.to_string(index=False))
+        print("═" * 100)
+
+        df_summary.to_csv('multi_lambda_summary.csv', index=False)
+        print(f"\nĐã lưu bảng tổng hợp vào 'multi_lambda_summary.csv'")
+
+        return df_summary
+
+    def plot_3d_error_surface(self):
+        """
+        Vẽ bề mặt sai số 3D đã sửa lỗi
+        """
+        fig = plt.figure(figsize=(14, 10))
+        ax = fig.add_subplot(111, projection='3d')
+
+        # Tạo dữ liệu với các giá trị hợp lý
+        lambda_vals = np.array([1, 2, 3, 4, 5, 6, 7, 8, 9, 10])  # 1 đến 10
+        n_vals = np.array([5, 10, 15, 20, 30, 50, 100, 200, 500])  # Các giá trị n
+
+        X, Y = np.meshgrid(lambda_vals, n_vals)
+        Z = np.zeros_like(X, dtype=float)
+
+        # Tính sai số cho mỗi cặp (λ, n)
+        for i in range(len(n_vals)):
+            for j in range(len(lambda_vals)):
+                lam = lambda_vals[j]
+                n = n_vals[i]
+
+                if n > lam:  # Đảm bảo p <= 1
+                    p = lam / n
+                    k_range = np.arange(0, min(int(lam * 3) + 3, 30))
+
+                    binom_probs = binom.pmf(k_range, n, p)
+                    poisson_probs = poisson.pmf(k_range, lam)
+
+                    Z[i, j] = np.mean(np.abs(binom_probs - poisson_probs))
+                else:
+                    Z[i, j] = np.nan  # Giá trị không hợp lệ
+
+        # Vẽ bề mặt
+        surf = ax.plot_surface(X, Y, Z, cmap='viridis',
+                              alpha=0.8, edgecolor='none', linewidth=0.1)
+
+        ax.set_xlabel('λ (Tham số Poisson)', fontsize=12, labelpad=10)
+        ax.set_ylabel('n (Số phép thử)', fontsize=12, labelpad=10)
+        ax.set_zlabel('Sai số trung bình (MAE)', fontsize=12, labelpad=10)
+        ax.set_title('Bề mặt sai số: Nhị thức → Poisson', fontsize=16, fontweight='bold', pad=20)
+
+        # Thêm thanh màu
+        fig.colorbar(surf, shrink=0.5, aspect=10, label='MAE')
+
+        # Điều chỉnh góc nhìn
+        ax.view_init(elev=30, azim=45)
+
+        # Thêm grid
+        ax.xaxis._axinfo['grid']['color'] = (0.5, 0.5, 0.5, 0.2)
+        ax.yaxis._axinfo['grid']['color'] = (0.5, 0.5, 0.5, 0.2)
+        ax.zaxis._axinfo['grid']['color'] = (0.5, 0.5, 0.5, 0.2)
+
+        plt.savefig('3d_error_surface_corrected.png', dpi=300, bbox_inches='tight', facecolor='white')
+        plt.show()
+
+        # Vẽ thêm contour plot 2D
+        self.plot_2d_contour(lambda_vals, n_vals, Z)
+
+    def plot_2d_contour(self, lambda_vals, n_vals, Z):
+        """
+        Vẽ contour plot 2D của sai số
+        """
+        plt.figure(figsize=(12, 8))
+
+        # Lọc bỏ các giá trị NaN
+        Z_clean = np.where(np.isnan(Z), 0, Z)
+
+        # Vẽ contour
+        contour = plt.contourf(lambda_vals, n_vals, Z_clean, 20, cmap='viridis')
+        plt.colorbar(contour, label='Sai số trung bình (MAE)')
+
+        # Thêm contour lines
+        CS = plt.contour(lambda_vals, n_vals, Z_clean, colors='black', linewidths=0.5, alpha=0.7)
+        plt.clabel(CS, inline=True, fontsize=8, fmt='%.3f')
+
+        plt.xlabel('λ (Tham số Poisson)', fontsize=12)
+        plt.ylabel('n (Số phép thử)', fontsize=12)
+        plt.title('Bản đồ sai số: Nhị thức → Poisson', fontsize=16, fontweight='bold')
+        plt.grid(True, alpha=0.3)
+        plt.xscale('linear')
+        plt.yscale('log')  # Dùng thang log cho n để dễ nhìn
+
+        # Đánh dấu vùng sai số thấp
+        plt.fill_between(lambda_vals, 20, 500, alpha=0.1, color='green', label='Vùng sai số thấp (n ≥ 20)')
+        plt.legend()
+
+        plt.savefig('2d_error_contour.png', dpi=300, bbox_inches='tight', facecolor='white')
+        plt.show()
+
+    def run_comprehensive_simulation(self):
+        print("=" * 100)
+        print("MÔ PHỎNG TOÀN DIỆN: PHÂN PHỐI NHỊ THỨC → POISSON".center(100))
+        print("=" * 100)
+        print(f"Tham số chính: λ = {self.lambda_param}")
+        print(f"Các giá trị n: {self.n_values}")
+        print("=" * 100)
+
+        # 1. Tính toán xác suất
+        print("\n1. Đang tính toán xác suất...")
+        results = self.calculate_probabilities()
+
+        # 2. Vẽ so sánh phân phối
+        print("2. Vẽ đồ thị so sánh phân phối...")
+        self.plot_comparison(results)
+
+        # 3. Phân tích tốc độ hội tụ
+        print("3. Phân tích tốc độ hội tụ...")
+        mae_values = self.plot_convergence(results)
+
+        # 4. Tạo bảng tổng hợp
+        print("4. Tạo bảng tổng hợp kết quả...")
+        data = []
         for n in self.n_values:
             binomial_key = f'Binomial_n={n}'
             binomial_probs = results[binomial_key]
             poisson_probs = results['Poisson']
 
-            # Tính các độ đo sai số
             mae = np.mean(np.abs(binomial_probs - poisson_probs))
             mse = np.mean((binomial_probs - poisson_probs)**2)
             max_error = np.max(np.abs(binomial_probs - poisson_probs))
 
             data.append({
                 'n': n,
-                'p': self.lambda_param / n,
+                'p = λ/n': f'{self.lambda_param/n:.6f}',
                 'MAE': f'{mae:.6f}',
-                'MSE': f'{mse:.6f}',
-                'Max Error': f'{max_error:.6f}',
-                'np': f'{self.lambda_param:.3f}'
+                'MSE': f'{mse:.8f}',
+                'Sai số lớn nhất': f'{max_error:.6f}',
+                'np = λ': f'{self.lambda_param:.3f}'
             })
 
         df = pd.DataFrame(data)
-        print("\n" + "="*80)
-        print("BẢNG TỔNG HỢP KẾT QUẢ MÔ PHỎNG")
-        print("="*80)
+        print("\n" + "═" * 90)
+        print(f"{'BẢNG TỔNG HỢP KẾT QUẢ (λ = ' + str(self.lambda_param) + ')':^90}")
+        print("═" * 90)
         print(df.to_string(index=False))
-        print("="*80)
+        print("═" * 90)
 
-        return df
+        # 5. Vẽ so sánh nhiều lambda (chỉ 1, 3, 5, 7)
+        print("\n5. Vẽ so sánh với các giá trị λ = [1, 3, 5, 7]...")
+        self.plot_multiple_lambda_comparison(lambda_list=[1, 3, 5, 7], n_values_plot=[5, 10, 20, 50])
 
-    def theoretical_derivation_plot(self):
-        """
-        Minh họa quá trình chứng minh toán học
-        """
-        fig, axes = plt.subplots(2, 2, figsize=(14, 10))
+        # 6. Vẽ bề mặt sai số 3D
+        print("6. Vẽ bề mặt sai số 3D...")
+        self.plot_3d_error_surface()
 
-        n_range = np.logspace(1, 3, 100)  # từ 10 đến 1000
+        # Phân tích xu hướng
+        print("\n" + "─" * 80)
+        print("PHÂN TÍCH XU HƯỚNG HỘI TỤ")
+        print("─" * 80)
 
-        # Plot 1: p = λ/n
-        ax1 = axes[0, 0]
-        p_values = self.lambda_param / n_range
-        ax1.plot(n_range, p_values, linewidth=2)
-        ax1.set_xscale('log')
-        ax1.set_xlabel('n')
-        ax1.set_ylabel('p = λ/n')
-        ax1.set_title('Xác suất p tiến về 0 khi n → ∞')
-        ax1.grid(True, alpha=0.3)
+        if len(mae_values) >= 2:
+            improvement = mae_values[0] / mae_values[-1]
+            print(f"• Khi n tăng từ {self.n_values[0]} đến {self.n_values[-1]}:")
+            print(f"  - Sai số giảm từ {mae_values[0]:.6f} xuống {mae_values[-1]:.6f}")
+            print(f"  - Tỉ lệ cải thiện: {improvement:.2f} lần")
+            print(f"  - Sai số giảm {((mae_values[0] - mae_values[-1])/mae_values[0]*100):.1f}%")
 
-        # Plot 2: np = λ (constant)
-        ax2 = axes[0, 1]
-        np_values = n_range * (self.lambda_param / n_range)
-        ax2.plot(n_range, np_values, linewidth=2)
-        ax2.set_xscale('log')
-        ax2.set_xlabel('n')
-        ax2.set_ylabel('n × p')
-        ax2.set_title('np = λ (giữ không đổi)')
-        ax2.grid(True, alpha=0.3)
-        ax2.axhline(y=self.lambda_param, color='r', linestyle='--', alpha=0.5)
-
-        # Plot 3: (1 - λ/n)^n → e^{-λ}
-        ax3 = axes[1, 0]
-        limit_values = (1 - self.lambda_param / n_range) ** n_range
-        exact_value = np.exp(-self.lambda_param)
-        ax3.plot(n_range, limit_values, label='(1 - λ/n)^n', linewidth=2)
-        ax3.axhline(y=exact_value, color='r', linestyle='--',
-                   label=f'e^{-self.lambda_param} ≈ {exact_value:.3f}', alpha=0.7)
-        ax3.set_xscale('log')
-        ax3.set_xlabel('n')
-        ax3.set_ylabel('Giá trị')
-        ax3.set_title('Giới hạn quan trọng: (1 - λ/n)^n → e^{-λ}')
-        ax3.legend()
-        ax3.grid(True, alpha=0.3)
-
-        # Plot 4: n!/((n-k)! n^k) → 1
-        ax4 = axes[1, 1]
-        k = 3  # chọn một giá trị k cụ thể
-        ratio_values = []
-        for n in n_range:
-            n_int = int(n)
-            if n_int > k:
-                # Tính gần đúng để tránh overflow
-                ratio = 1.0
-                for i in range(k):
-                    ratio *= (n_int - i) / n_int
-                ratio_values.append(ratio)
-            else:
-                ratio_values.append(np.nan)
-
-        ax4.plot(n_range[:len(ratio_values)], ratio_values, linewidth=2)
-        ax4.set_xscale('log')
-        ax4.set_xlabel('n')
-        ax4.set_ylabel('n!/((n-k)! n^k)')
-        ax4.set_title(f'Giới hạn: n!/((n-k)! n^k) → 1 (với k={k})')
-        ax4.axhline(y=1, color='r', linestyle='--', alpha=0.5)
-        ax4.grid(True, alpha=0.3)
-
-        plt.tight_layout()
-        plt.savefig('theoretical_derivation.png', dpi=300, bbox_inches='tight')
-        plt.show()
-
-    def run_simulation(self):
-        """
-        Chạy toàn bộ quá trình mô phỏng
-        """
-        print("="*80)
-        print("MÔ PHỎNG SỰ HỘI TỤ CỦA PHÂN PHỐI NHỊ THỨC VỀ PHÂN PHỐI POISSON")
-        print("="*80)
-        print(f"Tham số: λ = {self.lambda_param}")
-        print(f"Giá trị n: {self.n_values}")
-        print("="*80)
-
-        # Tính toán xác suất
-        results = self.calculate_probabilities()
-
-        # Minh họa chứng minh toán học
-        print("\n1. Minh họa quá trình chứng minh toán học...")
-        self.theoretical_derivation_plot()
-
-        # Vẽ đồ thị so sánh
-        print("\n2. Vẽ đồ thị so sánh phân phối...")
-        self.plot_comparison(results)
-
-        # Vẽ đồ thị hội tụ
-        print("\n3. Phân tích tốc độ hội tụ...")
-        mae_values = self.plot_convergence(results)
-
-        # Tạo bảng tổng hợp
-        print("\n4. Tạo bảng tổng hợp kết quả...")
-        df = self.create_summary_table(results)
-
-        # Phân tích bổ sung
-        print("\n5. Phân tích bổ sung:")
-        print(f"   - Khi n tăng từ {self.n_values[0]} đến {self.n_values[-1]}:")
-        print(f"   - Sai số giảm từ {mae_values[0]:.6f} xuống {mae_values[-1]:.6f}")
-        print(f"   - Tỉ lệ giảm: {mae_values[0]/mae_values[-1]:.2f} lần")
-
-        return results, df
+        print("\n" + "=" * 100)
+        print("KẾT THÚC MÔ PHỎNG".center(100))
+        print("=" * 100)
 
 # Thực thi mô phỏng
 if __name__ == "__main__":
     # Khởi tạo và chạy mô phỏng
     simulator = PoissonBinomialConvergence(lambda_param=3, n_values=[5, 10, 20, 50, 100, 200])
-    results, summary_df = simulator.run_simulation()
+    simulator.run_comprehensive_simulation()
 
-    # Lưu kết quả ra file
-    summary_df.to_csv('simulation_results.csv', index=False)
-    print("\nKết quả đã được lưu vào 'simulation_results.csv'")
-
-    # In thông báo kết thúc
-    print("\n" + "="*80)
-    print("KẾT THÚC MÔ PHỎNG")
-    print("="*80)
+    # In thông tin thêm
+    print("\nCác file đã tạo:")
+    print("1. poisson_binomial_comparison_enhanced.png - So sánh phân phối")
+    print("2. convergence_rate_enhanced.png - Tốc độ hội tụ")
+    print("3. multiple_lambda_comparison.png - So sánh 4 lambda (1,3,5,7)")
+    print("4. 3d_error_surface_corrected.png - Bề mặt sai số 3D (đã sửa)")
+    print("5. 2d_error_contour.png - Bản đồ sai số 2D")
+    print("6. multi_lambda_summary.csv - Bảng tổng hợp nhiều lambda")
